@@ -1,5 +1,5 @@
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued'
-import { Highlight, themes } from 'prism-react-renderer'
+import { Highlight, type PrismTheme } from 'prism-react-renderer'
 import { CopyButton } from '../shared/CopyButton'
 
 type Props = {
@@ -20,9 +20,33 @@ function inferLanguage(filePath: string): string {
   return langMap[ext ?? ''] || 'text'
 }
 
+/** Shared warm syntax theme — must stay in sync with CodeViewer */
+const warmSyntaxTheme: PrismTheme = {
+  plain: {
+    color: '#24201E',
+    backgroundColor: 'transparent',
+  },
+  styles: [
+    { types: ['comment', 'prolog', 'doctype', 'cdata'], style: { color: '#8C7E75', fontStyle: 'italic' as const } },
+    { types: ['string', 'attr-value', 'template-string'], style: { color: '#437220' } },
+    { types: ['keyword', 'selector', 'important', 'atrule'], style: { color: '#B8533B' } },
+    { types: ['function'], style: { color: '#1D5A8C' } },
+    { types: ['tag'], style: { color: '#B8533B' } },
+    { types: ['number', 'boolean'], style: { color: '#1B7A6A' } },
+    { types: ['operator'], style: { color: '#24201E' } },
+    { types: ['punctuation'], style: { color: '#5C504A' } },
+    { types: ['variable', 'parameter'], style: { color: '#24201E' } },
+    { types: ['property', 'attr-name'], style: { color: '#7A3E20' } },
+    { types: ['builtin', 'class-name', 'constant', 'symbol'], style: { color: '#7E5520' } },
+    { types: ['regex'], style: { color: '#C15F3C' } },
+    { types: ['inserted'], style: { color: '#1A7F37' } },
+    { types: ['deleted'], style: { color: '#CF222E' } },
+  ],
+}
+
 function highlightSyntax(str: string, language: string) {
   return (
-    <Highlight theme={themes.github} code={str} language={language}>
+    <Highlight theme={warmSyntaxTheme} code={str} language={language}>
       {({ tokens, getTokenProps }) => (
         <>
           {tokens.map((line, i) => (
@@ -41,36 +65,36 @@ function highlightSyntax(str: string, language: string) {
 const diffStyles = {
   variables: {
     light: {
-      diffViewerBackground: '#ffffff',
-      diffViewerColor: '#24292f',
-      addedBackground: '#dafbe1',
-      addedColor: '#24292f',
-      removedBackground: '#ffebe9',
-      removedColor: '#24292f',
-      wordAddedBackground: '#abf2bc',
-      wordRemovedBackground: '#ff818266',
-      addedGutterBackground: '#ccffd8',
-      removedGutterBackground: '#ffd7d5',
-      gutterBackground: '#f6f8fa',
-      gutterBackgroundDark: '#f0f1f3',
-      highlightBackground: '#fffbdd',
-      highlightGutterBackground: '#fff5b1',
-      codeFoldGutterBackground: '#dbedff',
-      codeFoldBackground: '#f1f8ff',
-      emptyLineBackground: '#fafbfc',
-      gutterColor: '#8b949e',
-      addedGutterColor: '#1a7f37',
-      removedGutterColor: '#cf222e',
-      codeFoldContentColor: '#57606a',
-      diffViewerTitleBackground: '#fafbfc',
-      diffViewerTitleColor: '#57606a',
-      diffViewerTitleBorderColor: '#d0d7de',
+      diffViewerBackground: '#FDFCF9',
+      diffViewerColor: '#3B3330',
+      addedBackground: '#E8F5E2',
+      addedColor: '#3B3330',
+      removedBackground: '#FDECEA',
+      removedColor: '#3B3330',
+      wordAddedBackground: '#B8E4A8',
+      wordRemovedBackground: '#F5B8B4',
+      addedGutterBackground: '#D4EDCA',
+      removedGutterBackground: '#F9D4D0',
+      gutterBackground: '#F4F4F0',
+      gutterBackgroundDark: '#EFEEEA',
+      highlightBackground: '#FFF5D6',
+      highlightGutterBackground: '#FFECB3',
+      codeFoldGutterBackground: '#E4EDF6',
+      codeFoldBackground: '#EDF4FB',
+      emptyLineBackground: '#F4F4F0',
+      gutterColor: '#87736D',
+      addedGutterColor: '#1A7F37',
+      removedGutterColor: '#CF222E',
+      codeFoldContentColor: '#87736D',
+      diffViewerTitleBackground: '#F4F4F0',
+      diffViewerTitleColor: '#87736D',
+      diffViewerTitleBorderColor: '#DAC1BA',
     },
   },
   diffContainer: {
     borderRadius: '0',
     fontSize: '12px',
-    lineHeight: '1.3',
+    lineHeight: '1.45',
     fontFamily: 'var(--font-mono)',
   },
   line: {
@@ -96,24 +120,26 @@ export function DiffViewer({ filePath, oldString, newString }: Props) {
   const deletions = oldLines.filter((l, i) => l !== (newLines[i] ?? null)).length
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[#d0d7de] bg-[#f6f8fa] text-[#24292f]">
-      <div className="flex items-center justify-between border-b border-[#d0d7de] bg-white px-3 py-1.5">
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-outline-variant)]/50 bg-[var(--color-surface-container-low)]">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container)] px-3 py-1.5">
         <div className="min-w-0">
-          <div className="truncate font-[var(--font-mono)] text-[11px] text-[#57606a]">
+          <div className="truncate font-[var(--font-mono)] text-[11px] text-[var(--color-text-tertiary)]">
             {filePath}
           </div>
           <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
-            <span className="rounded-full bg-[#dafbe1] px-2 py-0.5 text-[#1a7f37]">+{additions}</span>
-            <span className="rounded-full bg-[#ffebe9] px-2 py-0.5 text-[#cf222e]">-{deletions}</span>
+            <span className="rounded-full bg-[#E8F5E2] px-2 py-0.5 text-[#1A7F37]">+{additions}</span>
+            <span className="rounded-full bg-[#FDECEA] px-2 py-0.5 text-[#CF222E]">-{deletions}</span>
           </div>
         </div>
         <CopyButton
           text={`--- ${filePath}\n+++ ${filePath}`}
           label="Copy path"
-          className="rounded-md border border-[#d0d7de] bg-white px-2 py-1 text-[11px] text-[#57606a] transition-colors hover:bg-[#f3f4f6] hover:text-[#24292f]"
+          className="rounded-md border border-[var(--color-outline-variant)]/40 bg-[var(--color-surface-container-lowest)] px-2 py-1 text-[11px] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-container-high)] hover:text-[var(--color-text-primary)]"
         />
       </div>
 
+      {/* Diff area */}
       <div className="max-h-[400px] overflow-auto">
         <ReactDiffViewer
           oldValue={oldString}
