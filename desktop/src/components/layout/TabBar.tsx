@@ -4,7 +4,6 @@ import { useChatStore } from '../../stores/chatStore'
 import { useTranslation } from '../../i18n'
 
 const TAB_WIDTH = 180
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
 
 export function TabBar() {
   const tabs = useTabStore((s) => s.tabs)
@@ -97,13 +96,10 @@ export function TabBar() {
     }
   }
 
-  if (tabs.length === 0) {
-    // Still need drag region space in Tauri even with no tabs
-    return isTauri ? <div className="h-[38px] flex-shrink-0" data-tauri-drag-region /> : null
-  }
+  if (tabs.length === 0) return null
 
   return (
-    <div className={`flex items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] min-h-[36px] select-none ${isTauri ? 'pt-[38px]' : ''}`} data-tauri-drag-region>
+    <div className="flex items-center border-b border-[var(--color-border)] bg-[var(--color-surface)] min-h-[36px] select-none" data-tauri-drag-region>
       {canScrollLeft && (
         <button onClick={() => scroll('left')} className="flex-shrink-0 w-7 h-full flex items-center justify-center text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]">
           <span className="material-symbols-outlined text-[16px]">chevron_left</span>

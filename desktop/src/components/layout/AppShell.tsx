@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
 import { ToastContainer } from '../shared/Toast'
@@ -9,13 +9,10 @@ import { TabBar } from './TabBar'
 import { useTabStore } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 
-const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
-
 export function AppShell() {
   const fetchSettings = useSettingsStore((s) => s.fetchAll)
   const [ready, setReady] = useState(false)
   const [startupError, setStartupError] = useState<string | null>(null)
-  const startDraggingRef = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -48,22 +45,6 @@ export function AppShell() {
     }
   }, [fetchSettings])
 
-  // Pre-cache Tauri window drag function
-  useEffect(() => {
-    if (!isTauri) return
-    import(/* @vite-ignore */ '@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => {
-        const win = getCurrentWindow()
-        startDraggingRef.current = () => win.startDragging()
-      })
-      .catch(() => {})
-  }, [])
-
-  const handleDragMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, input, textarea, select, a, [role="button"]')) return
-    startDraggingRef.current?.()
-  }, [])
-
   useKeyboardShortcuts()
 
   if (startupError) {
@@ -90,17 +71,9 @@ export function AppShell() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden relative">
-      {/* Drag region for macOS Overlay title bar — full width strip at the top */}
-      {isTauri && (
-        <div
-          data-tauri-drag-region
-          onMouseDown={handleDragMouseDown}
-          className="absolute top-0 left-0 right-0 h-[38px] z-[9999]"
-        />
-      )}
+    <div className="h-screen flex overflow-hidden">
       <Sidebar />
-      <main id="content-area" className="flex-1 flex flex-col overflow-hidden relative">
+      <main id="content-area" className="flex-1 flex flex-col overflow-hidden">
         <TabBar />
         <ContentRouter />
       </main>
