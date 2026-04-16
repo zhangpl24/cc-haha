@@ -505,6 +505,14 @@ export class ConversationService {
       // should come from Desktop-managed config or inherited launch env, not
       // be reintroduced from the repo's .env file.
       CC_HAHA_SKIP_DOTENV: '1',
+      // "官方" 模式 (cc-haha/settings.json 没 provider env) 下,把 CLI 标记为
+      // managed-OAuth,让它忽略外部 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
+      // 残留、只走用户 /login 的 OAuth token。自定义 provider 模式绝不能设,
+      // 否则 CLI 会忽略 provider 的 AUTH_TOKEN、错误地走 OAuth 打到第三方
+      // endpoint。详见 src/utils/auth.ts isManagedOAuthContext()。
+      ...(this.shouldMarkManagedOAuth()
+        ? { CLAUDE_CODE_ENTRYPOINT: 'claude-desktop' }
+        : {}),
     }
   }
 
@@ -534,6 +542,37 @@ export class ConversationService {
       ].some((key) => typeof env[key] === 'string' && env[key]!.trim().length > 0)
     } catch {
       return false
+    }
+  }
+
+  /**
+   * 只有当用户处于"官方"模式(没有激活任何自定义 provider)时,才把 CLI 标记为
+   * managed-OAuth。激活自定义 provider 时 settings.json 里有 ANTHROPIC_AUTH_TOKEN;
+   * 这种情况下 CLI 必须按 token 路径走第三方 endpoint,不能被 managed 规则
+   * 强制切 OAuth。
+   *
+   * 默认 (读不到 settings.json) 按"官方"处理 — 即使用户从未用过 cc-haha
+   * provider 管理,也希望官方 OAuth 能正常工作。
+   */
+  private shouldMarkManagedOAuth(): boolean {
+    const configDir =
+      process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
+    const settingsPath = path.join(configDir, 'cc-haha', 'settings.json')
+    try {
+      const raw = fs.readFileSync(settingsPath, 'utf-8')
+      const parsed = JSON.parse(raw) as { env?: Record<string, string> }
+      const env = parsed.env ?? {}
+      const hasProviderEnv = [
+        'ANTHROPIC_API_KEY',
+        'ANTHROPIC_AUTH_TOKEN',
+        'ANTHROPIC_BASE_URL',
+      ].some(
+        (key) =>
+          typeof env[key] === 'string' && env[key]!.trim().length > 0,
+      )
+      return !hasProviderEnv
+    } catch {
+      return true
     }
   }
 
