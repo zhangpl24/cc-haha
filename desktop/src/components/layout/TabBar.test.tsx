@@ -216,7 +216,7 @@ describe('TabBar', () => {
     expect(startDraggingMock).not.toHaveBeenCalled()
   })
 
-  it('reorders tabs via drag and drop', async () => {
+  it('reorders tabs via pointer drag', async () => {
     const { TabBar } = await import('./TabBar')
     const { useTabStore } = await import('../../stores/tabStore')
     const { useChatStore } = await import('../../stores/chatStore')
@@ -237,17 +237,62 @@ describe('TabBar', () => {
       render(<TabBar />)
     })
 
-    const firstTab = screen.getByText('First Session').closest('[draggable="true"]')
-    const secondTab = screen.getByText('Second Session').closest('[draggable="true"]')
+    expect(screen.getByTestId('tab-bar').querySelector('.tab-bar-hit-area')).toBeInTheDocument()
+
+    const firstTab = screen.getByText('First Session').closest('.tab-bar-hit-area')
+    const secondTab = screen.getByText('Second Session').closest('.tab-bar-hit-area')
 
     expect(firstTab).toBeTruthy()
     expect(secondTab).toBeTruthy()
 
-    fireEvent.dragStart(firstTab!)
-    fireEvent.dragOver(secondTab!)
-    fireEvent.drop(secondTab!)
-    fireEvent.dragEnd(firstTab!)
+    Object.defineProperty(firstTab!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 0, width: 180 }),
+    })
+    Object.defineProperty(secondTab!, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ left: 180, width: 180 }),
+    })
+
+    fireEvent.mouseDown(firstTab!, { button: 0, clientX: 20, clientY: 10 })
+    fireEvent.mouseMove(window, { clientX: 260, clientY: 10 })
+
+    expect(firstTab).toHaveAttribute('data-dragging', 'true')
+
+    fireEvent.mouseUp(window)
 
     expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['tab-2', 'tab-1'])
+  })
+
+  it('does not reorder on a simple click without dragging', async () => {
+    const { TabBar } = await import('./TabBar')
+    const { useTabStore } = await import('../../stores/tabStore')
+    const { useChatStore } = await import('../../stores/chatStore')
+
+    useTabStore.setState({
+      tabs: [
+        { sessionId: 'tab-1', title: 'First Session', type: 'session', status: 'idle' },
+        { sessionId: 'tab-2', title: 'Second Session', type: 'session', status: 'idle' },
+      ],
+      activeTabId: 'tab-1',
+    })
+    useChatStore.setState({
+      sessions: {},
+      disconnectSession: vi.fn(),
+    } as Partial<ReturnType<typeof useChatStore.getState>>)
+
+    await act(async () => {
+      render(<TabBar />)
+    })
+
+    const firstTab = screen.getByText('First Session').closest('.tab-bar-hit-area')
+    expect(firstTab).toBeTruthy()
+
+    fireEvent.mouseDown(firstTab!, { button: 0, clientX: 20, clientY: 10 })
+    fireEvent.mouseUp(window)
+    fireEvent.click(firstTab!)
+
+    expect(useTabStore.getState().tabs.map((tab) => tab.sessionId)).toEqual(['tab-1', 'tab-2'])
+    expect(useTabStore.getState().activeTabId).toBe('tab-1')
   })
 })

@@ -412,6 +412,10 @@ button, input, textarea, select, a, [role="button"] {
 [draggable="true"] {
   -webkit-app-region: no-drag;
 }
+.tab-bar-hit-area,
+.tab-bar-hit-area * {
+  -webkit-app-region: no-drag;
+}
 
 /* Custom shadow from prototype */
 .custom-shadow {
