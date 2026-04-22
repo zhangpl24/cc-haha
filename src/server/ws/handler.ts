@@ -850,27 +850,31 @@ async function getRuntimeSettings(): Promise<{
   model?: string
   effort?: string
 }> {
+  // Check if a custom provider is active
+  const { activeId } = await providerService.listProviders()
   const userSettings = await settingsService.getUserSettings()
+  const providerSettings = activeId
+    ? await providerService.getManagedSettings()
+    : undefined
+  const modelSettings = providerSettings ?? userSettings
   const modelContext =
-    typeof userSettings.modelContext === 'string' && userSettings.modelContext.trim()
-      ? userSettings.modelContext
+    typeof modelSettings.modelContext === 'string' && modelSettings.modelContext.trim()
+      ? modelSettings.modelContext
       : undefined
   const effort =
     typeof userSettings.effort === 'string' && userSettings.effort.trim()
       ? userSettings.effort
       : undefined
 
-  // Check if a custom provider is active
-  const { activeId } = await providerService.listProviders()
-
   let model: string | undefined
   if (activeId) {
-    // Provider is active — only pass --model if user explicitly selected a non-default model.
-    // Otherwise the CLI should use ANTHROPIC_MODEL from env (set by syncToSettings).
-    // Default Anthropic model should be overridden by the provider's model.
-    const baseModel = (userSettings.model as string) || ''
-    if (baseModel && baseModel !== 'claude-sonnet-4-6') {
-      // User explicitly selected a different model — pass it through
+    // Provider is active — only consult provider-managed cc-haha settings.
+    // Global ~/.claude/settings.json model values must not bleed into provider mode.
+    const baseModel =
+      typeof modelSettings.model === 'string' && modelSettings.model.trim()
+        ? modelSettings.model
+        : ''
+    if (baseModel) {
       model = baseModel
       if (modelContext) model += `:${modelContext}`
     }

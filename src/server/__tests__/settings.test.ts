@@ -10,6 +10,7 @@ import { SettingsService } from '../services/settingsService.js'
 import { handleSettingsApi } from '../api/settings.js'
 import { handleModelsApi } from '../api/models.js'
 import { handleStatusApi, resetUsage, addUsage } from '../api/status.js'
+import { ProviderService } from '../services/providerService.js'
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ describe('Models API', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.models).toBeArray()
-    expect(body.models.length).toBe(4)
+    expect(body.models.length).toBe(3)
     expect(body.models[0].id).toContain('claude')
   })
 
@@ -264,7 +265,7 @@ describe('Models API', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.model.id).toBe('claude-sonnet-4-6')
+    expect(body.model.id).toBe('claude-opus-4-7')
   })
 
   it('PUT /api/models/current should switch model', async () => {
@@ -289,6 +290,66 @@ describe('Models API', () => {
     const { req, url, segments } = makeRequest('PUT', '/api/models/current', {})
     const res = await handleModelsApi(req, url, segments)
     expect(res.status).toBe(400)
+  })
+
+  it('GET /api/models/current should prefer cc-haha managed model over global user model when provider is active', async () => {
+    const settingsSvc = new SettingsService()
+    await settingsSvc.updateUserSettings({ model: 'kimi-k2.6' })
+
+    const providerSvc = new ProviderService()
+    const provider = await providerSvc.addProvider({
+      presetId: 'zhipuglm',
+      name: 'Zhipu GLM',
+      baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+      apiKey: 'test-key',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'glm-5.1',
+        haiku: 'glm-4.5-air',
+        sonnet: 'glm-5-turbo',
+        opus: 'glm-5.1',
+      },
+    })
+    await providerSvc.activateProvider(provider.id)
+    await providerSvc.updateManagedSettings({ model: 'glm-5-turbo' })
+
+    const { req, url, segments } = makeRequest('GET', '/api/models/current')
+    const res = await handleModelsApi(req, url, segments)
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.model.id).toBe('glm-5-turbo')
+  })
+
+  it('PUT /api/models/current should persist to cc-haha managed settings when provider is active', async () => {
+    const settingsSvc = new SettingsService()
+    const providerSvc = new ProviderService()
+    const provider = await providerSvc.addProvider({
+      presetId: 'zhipuglm',
+      name: 'Zhipu GLM',
+      baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+      apiKey: 'test-key',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'glm-5.1',
+        haiku: 'glm-4.5-air',
+        sonnet: 'glm-5-turbo',
+        opus: 'glm-5.1',
+      },
+    })
+    await providerSvc.activateProvider(provider.id)
+
+    const putReq = makeRequest('PUT', '/api/models/current', {
+      modelId: 'glm-5-turbo',
+    })
+    const putRes = await handleModelsApi(putReq.req, putReq.url, putReq.segments)
+    expect(putRes.status).toBe(200)
+
+    const managedSettings = await providerSvc.getManagedSettings()
+    expect(managedSettings.model).toBe('glm-5-turbo')
+
+    const globalSettings = await settingsSvc.getUserSettings()
+    expect(globalSettings.model).toBeUndefined()
   })
 
   it('GET /api/effort should return default effort level', async () => {

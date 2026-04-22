@@ -33,6 +33,14 @@ export const providersApi = {
     return api.get<AuthStatusResponse>('/api/providers/auth-status')
   },
 
+  getSettings() {
+    return api.get<Record<string, unknown>>('/api/providers/settings')
+  },
+
+  updateSettings(settings: Record<string, unknown>) {
+    return api.put<{ ok: true }>('/api/providers/settings', settings)
+  },
+
   create(input: CreateProviderInput) {
     return api.post<ProviderResponse>('/api/providers', input)
   },

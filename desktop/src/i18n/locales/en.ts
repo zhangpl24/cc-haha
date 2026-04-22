@@ -102,7 +102,7 @@ export const en = {
   'settings.providers.sameAsMain': 'Same as main',
   'settings.providers.testConnection': 'Test Connection',
   'settings.providers.settingsJson': 'Settings JSON',
-  'settings.providers.settingsJsonDesc': '~/.claude/settings.json — edit directly, will be written on save.',
+  'settings.providers.settingsJsonDesc': '~/.claude/cc-haha/settings.json — edit directly, will be written on save.',
   'settings.providers.jsonError': 'JSON syntax error: {error}',
   'settings.providers.apiFormat': 'API Format',
   'settings.providers.apiFormatAnthropic': 'Anthropic Messages (native)',

@@ -350,8 +350,8 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
       jsonPastedRef.current = false
       return
     }
-    import('../api/settings').then(({ settingsApi }) => {
-      settingsApi.getUser().then((settings) => {
+    import('../api/providers').then(({ providersApi }) => {
+      providersApi.getSettings().then((settings) => {
         const needsProxy = apiFormat !== 'anthropic'
         const merged = {
           ...settings,
@@ -390,12 +390,13 @@ function ProviderFormModal({ open, onClose, mode, provider, presets }: ProviderF
     if (!canSubmit) return
     setIsSubmitting(true)
     try {
-      // Write the edited settings.json first (for all presets including official)
+      // Write the edited cc-haha settings.json first so provider-specific model
+      // settings never conflict with the user's global ~/.claude/settings.json.
       if (settingsJson.trim()) {
         try {
           const parsed = JSON.parse(settingsJson)
-          const { settingsApi } = await import('../api/settings')
-          await settingsApi.updateUser(parsed)
+          const { providersApi } = await import('../api/providers')
+          await providersApi.updateSettings(parsed)
         } catch {
           // JSON validation already prevents this
         }

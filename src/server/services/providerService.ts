@@ -115,6 +115,15 @@ export class ProviderService {
     }
   }
 
+  async getManagedSettings(): Promise<Record<string, unknown>> {
+    return this.readSettings()
+  }
+
+  async updateManagedSettings(settings: Record<string, unknown>): Promise<void> {
+    const current = await this.readSettings()
+    await this.writeSettings(Object.assign({}, current, settings))
+  }
+
   // --- CRUD ---
 
   async listProviders(): Promise<{ providers: SavedProvider[]; activeId: string | null }> {
@@ -530,4 +539,3 @@ function validateResponseBody(
   }
   return { ok: true, model: (body.model as string) || undefined }
 }
-
