@@ -176,6 +176,7 @@ export const SDKControlGetContextUsageRequestSchema = lazySchema(() =>
   z
     .object({
       subtype: z.literal('get_context_usage'),
+      estimateOnly: z.boolean().optional(),
     })
     .describe(
       'Requests a breakdown of current context window usage by category.',

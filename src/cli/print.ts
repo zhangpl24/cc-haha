@@ -2973,6 +2973,7 @@ function runHeadlessStreaming(
                 agentDefinitions: appState.agentDefinitions,
                 customSystemPrompt: options.systemPrompt,
                 appendSystemPrompt: options.appendSystemPrompt,
+                estimateOnly: Boolean(message.request.estimateOnly),
               },
             })
             sendControlResponseSuccess(message, { ...data })

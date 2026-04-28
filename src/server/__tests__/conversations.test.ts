@@ -690,6 +690,7 @@ describe('WebSocket Chat Integration', () => {
     expect(body.usage.costDisplay).toBe('$0.1234')
     expect(body.usage.source).toBe('current_process')
     expect(body.context.model).toBe('mock-opus')
+    expect(body.context.estimateOnly).toBe(true)
     expect(body.status.mcpServers).toEqual([{ name: 'mock', status: 'connected' }])
 
     const basicRes = await fetch(`${baseUrl}/api/sessions/${sessionId}/inspection?includeContext=0`)

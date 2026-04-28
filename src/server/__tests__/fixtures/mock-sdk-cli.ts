@@ -239,6 +239,7 @@ ws.addEventListener('message', (event) => {
                 }),
               ),
               model: 'mock-opus',
+              estimateOnly: parsed.request.estimateOnly === true,
               memoryFiles: [],
               mcpTools: [{ name: 'mock_tool', serverName: 'mock', tokens: 144, isLoaded: true }],
               agents: [],

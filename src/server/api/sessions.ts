@@ -285,7 +285,11 @@ async function getSessionInspection(sessionId: string, url: URL): Promise<Respon
   const [usageResult, contextResult, mcpResult] = await Promise.allSettled([
     conversationService.requestControl(sessionId, { subtype: 'get_session_usage' }, basicControlTimeoutMs),
     includeContext
-      ? conversationService.requestControl(sessionId, { subtype: 'get_context_usage' }, 20_000)
+      ? conversationService.requestControl(
+          sessionId,
+          { subtype: 'get_context_usage', estimateOnly: true },
+          20_000,
+        )
       : Promise.resolve(null),
     conversationService.requestControl(sessionId, { subtype: 'mcp_status' }, basicControlTimeoutMs),
   ])
