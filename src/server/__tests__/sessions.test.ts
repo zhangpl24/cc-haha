@@ -8,6 +8,8 @@ import { execFileSync } from 'node:child_process'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { SessionService } from '../services/sessionService.js'
+import { sessionService } from '../services/sessionService.js'
+import { conversationService } from '../services/conversationService.js'
 import { clearCommandsCache } from '../../commands.js'
 import { sanitizePath } from '../../utils/sessionStoragePortable.js'
 
@@ -1159,6 +1161,31 @@ describe('Sessions API', () => {
     // Verify it's gone
     const res2 = await fetch(`${baseUrl}/api/sessions/${sessionId}`)
     expect(res2.status).toBe(404)
+  })
+
+  it('DELETE /api/sessions/:id should roll back the deleted marker when file deletion fails', async () => {
+    const sessionId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+    await writeSessionFile('-tmp-api-test', sessionId, [makeSnapshotEntry()])
+
+    const originalDeleteSession = sessionService.deleteSession.bind(sessionService)
+    sessionService.deleteSession = (async (targetSessionId: string) => {
+      if (targetSessionId === sessionId) {
+        throw new Error('simulated unlink failure')
+      }
+      return originalDeleteSession(targetSessionId)
+    }) as typeof sessionService.deleteSession
+
+    try {
+      const res = await fetch(`${baseUrl}/api/sessions/${sessionId}`, { method: 'DELETE' })
+      expect(res.status).toBe(500)
+      expect((conversationService as any).deletedSessions.has(sessionId)).toBe(false)
+
+      const detailRes = await fetch(`${baseUrl}/api/sessions/${sessionId}`)
+      expect(detailRes.status).toBe(200)
+    } finally {
+      sessionService.deleteSession = originalDeleteSession as typeof sessionService.deleteSession
+      conversationService.unmarkSessionDeleted(sessionId)
+    }
   })
 
   it('PATCH /api/sessions/:id should rename the session', async () => {

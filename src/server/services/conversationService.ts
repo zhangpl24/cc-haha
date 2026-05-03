@@ -545,6 +545,10 @@ export class ConversationService {
     this.stopSession(sessionId)
   }
 
+  unmarkSessionDeleted(sessionId: string): void {
+    this.deletedSessions.delete(sessionId)
+  }
+
   getActiveSessions(): string[] {
     return Array.from(this.sessions.keys())
   }
