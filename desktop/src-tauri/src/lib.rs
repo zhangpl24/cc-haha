@@ -188,12 +188,12 @@ struct StoredWindowState {
 
 /// 与 ServerState 平级的 adapter 子进程状态。
 ///
-/// adapter sidecar（claude-sidecar adapters --feishu --telegram --wechat --dingtalk）的生命周期
+/// adapter sidecar（claude-sidecar adapters --telegram 等）的生命周期
 /// 跟 server 不同：它没有 HTTP 端口可探活，没配凭据时会自己干净退出，
-/// 而且需要支持运行时热重启 —— 用户在设置页保存飞书 / Telegram 凭据后，
+/// 而且需要支持运行时热重启 —— 用户在设置页保存 IM 凭据后，
 /// 前端会通过 invoke('restart_adapters_sidecar') 来重启它，让新凭据生效。
 #[derive(Default)]
-struct AdapterState(Mutex<Option<CommandChild>>);
+struct AdapterState(Mutex<Vec<CommandChild>>);
 
 #[derive(Default)]
 struct TerminalState {
@@ -1081,9 +1081,9 @@ fn stop_server_sidecar(app: &AppHandle) {
     }
 }
 
-/// 启动 adapter sidecar。返回 Result 主要为了把"无法 spawn"和"spawn 后立刻
-/// 退出（凭据缺失）"区分开 —— 后者不算错误，是正常 default 状态。
-fn start_adapters_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
+/// 启动 adapter sidecars。每个平台单独一个进程，避免某个平台的 SDK / long polling
+/// 影响其它平台（Telegram 尤其要求同一个 Bot Token 只有一个活跃 consumer）。
+fn start_adapters_sidecars(app: &AppHandle) -> Result<Vec<CommandChild>, String> {
     #[cfg(unix)]
     kill_stale_unix_adapter_sidecars();
 
@@ -1117,65 +1117,73 @@ fn start_adapters_sidecar(app: &AppHandle) -> Result<CommandChild, String> {
         server_http_url.clone()
     };
 
-    let mut sidecar = app
-        .shell()
-        .sidecar("claude-sidecar")
-        .map_err(|err| format!("resolve sidecar: {err}"))?;
-    for (key, value) in terminal_environment(&default_shell()) {
-        sidecar = sidecar.env(key, value);
-    }
-    let sidecar = sidecar.env("ADAPTER_SERVER_URL", &server_ws_url).args([
-        "adapters",
-        "--app-root",
-        &app_root_arg,
-        "--feishu",
-        "--telegram",
-        "--wechat",
-        "--dingtalk",
-    ]);
-
-    let (mut rx, child) = sidecar
-        .spawn()
-        .map_err(|err| format!("spawn adapter sidecar: {err}"))?;
-
-    // 用一个 async task 把 sidecar 的 stdout/stderr 转发出来。它退出时
-    // 整个 task 也会自然结束。
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => {
-                    let line = String::from_utf8_lossy(&line);
-                    println!("[claude-adapters] {}", line.trim_end());
-                }
-                CommandEvent::Stderr(line) => {
-                    let line = String::from_utf8_lossy(&line);
-                    eprintln!("[claude-adapters] {}", line.trim_end());
-                }
-                CommandEvent::Terminated(payload) => {
-                    // exit code != 0 是常态：用户没配凭据时 sidecar 内部会
-                    // warn + skip + process.exit(1)。这里只 info 一行，
-                    // 不要当错误冒泡。
-                    println!(
-                        "[claude-adapters] sidecar exited (code={:?}, signal={:?})",
-                        payload.code, payload.signal
-                    );
-                }
-                _ => {}
-            }
+    let mut children = Vec::new();
+    for (label, flag) in [
+        ("feishu", "--feishu"),
+        ("telegram", "--telegram"),
+        ("wechat", "--wechat"),
+        ("dingtalk", "--dingtalk"),
+    ] {
+        let mut sidecar = app
+            .shell()
+            .sidecar("claude-sidecar")
+            .map_err(|err| format!("resolve {label} adapter sidecar: {err}"))?;
+        for (key, value) in terminal_environment(&default_shell()) {
+            sidecar = sidecar.env(key, value);
         }
-    });
+        let sidecar = sidecar.env("ADAPTER_SERVER_URL", &server_ws_url).args([
+            "adapters",
+            "--app-root",
+            &app_root_arg,
+            flag,
+        ]);
 
-    Ok(child)
+        let (mut rx, child) = sidecar
+            .spawn()
+            .map_err(|err| format!("spawn {label} adapter sidecar: {err}"))?;
+        let label = label.to_string();
+
+        // 用一个 async task 把 sidecar 的 stdout/stderr 转发出来。它退出时
+        // 整个 task 也会自然结束。
+        tauri::async_runtime::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                match event {
+                    CommandEvent::Stdout(line) => {
+                        let line = String::from_utf8_lossy(&line);
+                        println!("[claude-adapters:{label}] {}", line.trim_end());
+                    }
+                    CommandEvent::Stderr(line) => {
+                        let line = String::from_utf8_lossy(&line);
+                        eprintln!("[claude-adapters:{label}] {}", line.trim_end());
+                    }
+                    CommandEvent::Terminated(payload) => {
+                        // exit code != 0 是常态：用户没配凭据时 sidecar 内部会
+                        // warn + skip + process.exit(1)。这里只 info 一行，
+                        // 不要当错误冒泡。
+                        println!(
+                            "[claude-adapters:{label}] sidecar exited (code={:?}, signal={:?})",
+                            payload.code, payload.signal
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        children.push(child);
+    }
+
+    Ok(children)
 }
 
-/// spawn adapter sidecar 并把 child handle 存进 AdapterState。
+/// spawn adapter sidecars 并把 child handles 存进 AdapterState。
 /// 在启动 + 重启路径里复用，集中处理"无法 spawn"的日志。
 fn spawn_and_track_adapters_sidecar(app: &AppHandle) {
-    match start_adapters_sidecar(app) {
-        Ok(child) => {
+    match start_adapters_sidecars(app) {
+        Ok(children) => {
             if let Some(state) = app.try_state::<AdapterState>() {
                 if let Ok(mut guard) = state.0.lock() {
-                    *guard = Some(child);
+                    *guard = children;
                 }
             }
         }
@@ -1192,7 +1200,7 @@ fn stop_adapters_sidecar(app: &AppHandle) {
     let Ok(mut guard) = state.0.lock() else {
         return;
     };
-    if let Some(child) = guard.take() {
+    for child in guard.drain(..) {
         let _ = child.kill();
     }
 }
