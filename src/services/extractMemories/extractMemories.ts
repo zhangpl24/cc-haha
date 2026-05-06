@@ -43,7 +43,7 @@ import type {
 } from '../../types/message.js'
 import { createAbortController } from '../../utils/abortController.js'
 import { count, uniq } from '../../utils/array.js'
-import { logForDebugging } from '../../utils/debug.js'
+import { isMemoryDebugEnabled, logForDebugging } from '../../utils/debug.js'
 import {
   createCacheSafeParams,
   runForkedAgent,
@@ -456,8 +456,27 @@ export function initExtractMemories(): void {
         logForDebugging(
           `[extractMemories] memories saved: ${writtenPaths.join(', ')}`,
         )
+        if (isMemoryDebugEnabled()) {
+          require('fs').appendFileSync(
+            '/tmp/cc-memory.log',
+            `\n┌──────────────────────────────────────────\n` +
+            `│ 💾 extractMemories   ${new Date().toISOString().replace('T', ' ').slice(0, 19)}\n` +
+            `│    保存了 ${writtenPaths.length} 个文件:\n` +
+            writtenPaths.map((p: string) => `│    📄 ${p}`).join('\n') +
+            `\n└──────────────────────────────────────────\n`,
+          )
+        }
       } else {
         logForDebugging('[extractMemories] no memories saved this run')
+        if (isMemoryDebugEnabled()) {
+          require('fs').appendFileSync(
+            '/tmp/cc-memory.log',
+            `\n┌──────────────────────────────────────────\n` +
+            `│ ⏭️  extractMemories   ${new Date().toISOString().replace('T', ' ').slice(0, 19)}\n` +
+            `│    无新记忆可保存\n` +
+            `└──────────────────────────────────────────\n`,
+          )
+        }
       }
 
       // Index file updates are mechanical — the agent touches MEMORY.md to add
@@ -533,14 +552,6 @@ export function initExtractMemories(): void {
       return
     }
 
-    if (!getFeatureValue_CACHED_MAY_BE_STALE('tengu_passport_quail', false)) {
-      if (process.env.USER_TYPE === 'ant' && !hasLoggedGateFailure) {
-        hasLoggedGateFailure = true
-        logEvent('tengu_extract_memories_gate_disabled', {})
-      }
-      return
-    }
-
     // Check auto-memory is enabled
     if (!isAutoMemoryEnabled()) {
       return
@@ -549,6 +560,15 @@ export function initExtractMemories(): void {
     // Skip in remote mode
     if (getIsRemoteMode()) {
       return
+    }
+
+    if (isMemoryDebugEnabled()) {
+      require('fs').appendFileSync(
+        '/tmp/cc-memory.log',
+        `\n┌──────────────────────────────────────────\n` +
+        `│ 🔍 extractMemories   ${new Date().toISOString().replace('T', ' ').slice(0, 19)}\n` +
+        `└──────────────────────────────────────────\n`,
+      )
     }
 
     // If an extraction is already in progress, stash this context for a

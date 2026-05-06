@@ -9,6 +9,7 @@ import memoize from 'lodash-es/memoize.js'
 import { getIsRemoteMode } from '../../bootstrap/state.js'
 import { getSystemPrompt } from '../../constants/prompts.js'
 import { getSystemContext, getUserContext } from '../../context.js'
+import { isMemoryDebugEnabled } from '../../utils/debug.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
 import type { Tool, ToolUseContext } from '../../Tool.js'
 import { FILE_EDIT_TOOL_NAME } from '../../tools/FileEditTool/constants.js'
@@ -280,21 +281,20 @@ const extractSessionMemory = sequential(async function (
     return
   }
 
-  // Check gate lazily when hook runs (cached, non-blocking)
-  if (!isSessionMemoryGateEnabled()) {
-    // Log gate failure once per session (ant-only)
-    if (process.env.USER_TYPE === 'ant' && !hasLoggedGateFailure) {
-      hasLoggedGateFailure = true
-      logEvent('tengu_session_memory_gate_disabled', {})
-    }
-    return
-  }
-
   // Initialize config from remote (lazy, only once)
   initSessionMemoryConfigIfNeeded()
 
   if (!shouldExtractMemory(messages)) {
     return
+  }
+
+  if (isMemoryDebugEnabled()) {
+    require('fs').appendFileSync(
+      '/tmp/cc-memory.log',
+      `\n┌──────────────────────────────────────────\n` +
+      `│ 📝 sessionMemory   ${new Date().toISOString().replace('T', ' ').slice(0, 19)}\n` +
+      `└──────────────────────────────────────────\n`,
+    )
   }
 
   markExtractionStarted()
@@ -323,6 +323,16 @@ const extractSessionMemory = sequential(async function (
     forkLabel: 'session_memory',
     overrides: { readFileState: setupContext.readFileState },
   })
+
+  if (isMemoryDebugEnabled()) {
+    require('fs').appendFileSync(
+      '/tmp/cc-memory.log',
+      `\n┌──────────────────────────────────────────\n` +
+      `│ ✅ sessionMemory   ${new Date().toISOString().replace('T', ' ').slice(0, 19)}\n` +
+      `│    已更新: ${memoryPath}\n` +
+      `└──────────────────────────────────────────\n`,
+    )
+  }
 
   // Log extraction event for tracking frequency
   // Use the token usage from the last message in the conversation

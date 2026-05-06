@@ -200,6 +200,11 @@ export async function flushDebugLogs(): Promise<void> {
   await pendingWrite
 }
 
+/** Only write memory debug logs when this env var is set to 1. */
+export function isMemoryDebugEnabled(): boolean {
+  return isEnvTruthy(process.env.CC_HAHA_DEBUG_MEMORY)
+}
+
 export function logForDebugging(
   message: string,
   { level }: { level: DebugLogLevel } = {
